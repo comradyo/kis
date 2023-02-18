@@ -109,3 +109,50 @@ a[a %% 2 == 0]
 ## сохранить объекты x,y.
 
 ###########################
+
+# В комиссии из 5 человек 4 члена принимают независимо друг от друга правильное решение с вероятностью 0.9, 
+# а пятый для принятия решения бросает монету. 
+# Окончательное решенние принимается большинством голосов. 
+# Кто с большей вероятностью принимает правильное решение: 
+# комиссия или один человек из комиссии?
+
+# return<-VALUE - засовывает VALUE в return, и только потом это значение возвращается (после отрабатывания функции)
+# return(VALUE) - мгновенно возвращает VALUE, работа функции прерывается
+genWithProbability<-function(prob) 
+{
+  val<-runif(1,0,1)
+  if (val > prob) {
+    return<-0
+  } else {
+    return<-1
+  }
+}
+
+prob<-0.9
+
+totalVoicesRes <- 0
+singleVoiceRes <- 0
+
+for (i in c(1:1000)) {
+  x <-c(genWithProbability(prob),
+        genWithProbability(prob),
+        genWithProbability(prob), 
+        genWithProbability(prob), 
+        genWithProbability(0.5))
+  
+  totalVoices<-sum(x)
+  if (totalVoices > 2) {
+    totalVoicesRes <- totalVoicesRes + 1
+  }
+  j<-runif(1, 1, 5)
+  
+  if (x[j] == 1) {
+    singleVoiceRes <- singleVoiceRes + 1
+  }
+  
+}
+
+totalVoicesRes
+singleVoiceRes
+
+##########
