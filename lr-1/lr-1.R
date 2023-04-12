@@ -323,26 +323,25 @@ H1_vec(Res$solution) #111429.5
 H2_vec(Res$solution) #6153.85
 
 optimum<-c(
-  #total_price   #total_speed   #total_ram   #total_hd
-  7460.887,      335.648,       41.435,      3749.418, 
-  29843.550,     1664.352,      165.740,     13331.264, 
-  4476.533,      156.033,       149.166,     7498.836, 
-  7460.887,      260.055,       50.834,      5832.428
+  # поменял порядок, поскольку он именно такой в датасете
+  #total_price   #total_speed   #total_hd    #total_ram
+  7460.887,      335.648,       3749.418,    41.435,
+  29843.550,     1664.352,      13331.264,   165.740,
+  4476.533,      156.033,       7498.836,    149.166,
+  7460.887,      260.055,       5832.428,    50.834
 )
 
 lmPrice <- 1492.1775
 # N<-c(ceiling(optimum[1]/lmPrice), ceiling(optimum[5]/lmPrice), ceiling(optimum[9]/lmPrice), ceiling(optimum[13]/lmPrice))
 N<-c(     optimum[1]/lmPrice, optimum[5]/lmPrice, optimum[9]/lmPrice,  optimum[13]/lmPrice )
 Speed<-c( optimum[2]/N[1],    optimum[6]/N[2],    optimum[10]/N[3],    optimum[14]/N[4] )
-Ram<-c(   optimum[3]/N[1],    optimum[7]/N[2],    optimum[11]/N[3],    optimum[15]/N[4] )
-Hd<-c(    optimum[4]/N[1],    optimum[8]/N[2],    optimum[12]/N[3],    optimum[16]/N[4] )
+Hd<-c(    optimum[3]/N[1],    optimum[7]/N[2],    optimum[11]/N[3],    optimum[15]/N[4] )
+Ram<-c(   optimum[4]/N[1],    optimum[8]/N[2],    optimum[12]/N[3],    optimum[16]/N[4] )
 # Идеальные точки для каждого из сегментов
-ideals<-c(
-  c(Speed[1], Ram[1], Hd[1]),
-  c(Speed[2], Ram[2], Hd[2]),
-  c(Speed[3], Ram[3], Hd[3]),
-  c(Speed[4], Ram[4], Hd[4])
-)
+ideal_1 = c(Speed[1], Hd[1], Ram[1])
+ideal_2 = c(Speed[2], Hd[2], Ram[2])
+ideal_3 = c(Speed[3], Hd[3], Ram[3])
+ideal_4 = c(Speed[4], Hd[4], Ram[4])
 
 ###############################
 # Утилиты
@@ -354,7 +353,7 @@ distance<-function(A, B){
 
 # Приведение конструктивных показатей к однонаправленной шкале [0,100], 
 # направление улучшения - возрастание показателя.
-ScaledDataset <- function(dataset) {
+NormalizeDataset <- function(dataset) {
   # определение максимального значения из столбца
   # Vmax<-max(frame$field_i); 
   # определение минимального значения из столбца
@@ -386,6 +385,26 @@ ScaledDataset <- function(dataset) {
   return(newDataset)
 }
 
+# Приведение конструктивных показатей к однонаправленной шкале [0,100], 
+# направление улучшения - возрастание показателя.
+NormalizedIdeal <- function(dataset, ideal) {
+  N <- 100
+  # скорость; чем выше, тем лучше
+  maxVal <- max(dataset$speed);
+  minVal <- min(dataset$speed);
+  nSpeed <- N * (ideal[1] - minVal) / (maxVal - minVal)
+  # объем жесткого диска; чем больше, тем лучше
+  maxVal <- max(dataset$hd);
+  minVal <- min(dataset$hd);
+  nHd <- N * (ideal[2] - minVal) / (maxVal - minVal)
+  # объем оперативной памяти; чем больше, тем лучше
+  maxVal <- max(dataset$ram);
+  minVal <- min(dataset$ram);
+  nRam <- N * (ideal[3] - minVal) / (maxVal - minVal)
+  return(c(nSpeed, nHd, nRam))
+}
+
+
 # Проверка доминирования по Парето X над Y
 DominatesOver<-function(X, Y) {
   # у X есть хотя-бы один параметр, который лучше, чем у Y.
@@ -407,46 +426,68 @@ DominatesOver<-function(X, Y) {
 ###############################
 ###############################
 
+# Отобор вариантов, удовлетворяющих условиям работоспособности.
+FilteredDataset<-data.frame()
+nrow(Dataset)
+for (i in c(1:length(rownames(Dataset))))
+{
+  if (Dataset[i, "screen"] >= 15 & Dataset[i, "multi"] == "yes") {
+    FilteredDataset<-rbind(FilteredDataset, Dataset[i,])
+  }
+}
+nrow(FilteredDataset)
+
 # приведение к одной шкале
-scaledDataset <- ScaledDataset(Dataset)
-head(scaledDataset)
+nDataset <- NormalizeDataset(FilteredDataset)
 
 # определение парето-оптимальных вариантов
-pOptVaiants<-c()
-for (i in c(1:length(rownames(scaledDataset))) ) {
+pOptVaiantsIDs<-c()
+for (i in c(1:length(rownames(nDataset))) ) {
   isParetoOptiomal<-TRUE
-  for (j in c(1:length(rownames(scaledDataset)))) {
-    if (DominatesOver(scaledDataset[j,], scaledDataset[i,])) {
+  for (j in c(1:length(rownames(nDataset)))) {
+    if (DominatesOver(nDataset[j,], nDataset[i,])) {
       isParetoOptiomal<-FALSE # если над i-м вариантом доминирует какой-либо j-й, то i-й точно не оптимален по Парето.
     }
   }
   if (isParetoOptiomal) {
-    pOptVaiants<-c(pOptVaiants, rownames(scaledDataset)[i])
+    pOptVaiantsIDs<-c(pOptVaiantsIDs, rownames(nDataset)[i])
   }
 }
+pOptVaiantsIDs
 
-pOptVaiants
-
-getClosestOption<-function(ideal, options){
+# выбрать наиболее близкую к идеалу альтернативу
+getClosestOption<-function(nIdeal, optVariantsIDs){
   minDist <- .Machine$integer.max
-  closestOptionID
-  for (i in c(1:length(options))) {
-    tempDist <- distance(ideal, options[i]) 
+  closestOptionID<-1
+  for (i in optVariantsIDs){
+    tempDist <- distance(nIdeal, nDataset[i, (3:5)])
     if (tempDist < minDist) {
       minDist <- tempDist
       closestOptionID = i
     }
   }
-  return(options[i])
+  return(closestOptionID)
 }
 
+# Нормализованные идеальные точки для каждого из сегментов
+nIdeal_1 = NormalizedIdeal(Dataset, ideal_1)
+nIdeal_2 = NormalizedIdeal(Dataset, ideal_2)
+nIdeal_3 = NormalizedIdeal(Dataset, ideal_3)
+nIdeal_4 = NormalizedIdeal(Dataset, ideal_4)
+
 # лучшие варианты для каждого из сегментов
-closestOptions <- c(
-  getClosestOption(ideal[1], pOptVaiants),
-  getClosestOption(ideal[2], pOptVaiants),
-  getClosestOption(ideal[3], pOptVaiants),
-  getClosestOption(ideal[4], pOptVaiants),
+closestOptionsIDs <- c(
+  getClosestOption(nIdeal_1, pOptVaiantsIDs),
+  getClosestOption(nIdeal_2, pOptVaiantsIDs),
+  getClosestOption(nIdeal_3, pOptVaiantsIDs),
+  getClosestOption(nIdeal_4, pOptVaiantsIDs)
 )
 
-closestOptions
+pOptVaiantsIDs
+
+# результаты
+FilteredDataset[closestOptionsIDs[1], ]
+FilteredDataset[closestOptionsIDs[2], ]
+FilteredDataset[closestOptionsIDs[3], ]
+FilteredDataset[closestOptionsIDs[4], ]
 
